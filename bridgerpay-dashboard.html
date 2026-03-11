@@ -8,8 +8,6 @@
         <link rel="stylesheet" href="style.css" />
     </head>
     <body>
-
-
         <!-- Loading overlay -->
         <div id="overlay">
             <div class="spinner"></div>
@@ -77,22 +75,18 @@
                 >
                     📊 Data
                 </button>
-                <button
-                    class="tabbt"
-                    id="tab-up"
-                    onclick="switchTab('up')"
-                >
+                <button class="tabbt" id="tab-up" onclick="switchTab('up')">
                     📁 Uploads (0)
                 </button>
                 <button
                     class="btn btn-red sm"
-                    style="margin-left: 10px;"
+                    style="margin-left: 10px"
                     onclick="logout()"
                 >
                     Logout
                 </button>
-                </div>
-                </div>
+            </div>
+        </div>
 
         <!-- App -->
         <div id="app">
@@ -381,32 +375,32 @@
         <script>
             // ── Auth Check ──
             (async function checkAuth() {
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem("token");
                 if (!token) {
-                    window.location.href = 'index.html';
+                    window.location.href = "index.html";
                     return;
                 }
 
                 try {
-                    const res = await fetch('/api/user', {
-                        headers: { 'x-auth-token': token }
+                    const res = await fetch("/api/user", {
+                        headers: { "x-auth-token": token },
                     });
                     if (res.ok) {
                         const user = await res.json();
-                        document.getElementById('logo').innerHTML = `Bridgerpay <b>Dashboard</b> <span style="font-size:12px; color:#3a5e78; font-weight:normal; margin-left:10px;">Welcome, ${user.name}</span>`;
+                        document.getElementById("logo").innerHTML =
+                            `Bridgerpay <b>Dashboard</b> <span style="font-size:12px; color:#3a5e78; font-weight:normal; margin-left:10px;">Welcome, ${user.name}</span>`;
                     } else {
                         logout();
                     }
                 } catch (err) {
-                    console.error('Failed to fetch user', err);
+                    console.error("Failed to fetch user", err);
                 }
             })();
 
             function logout() {
-                localStorage.removeItem('token');
-                window.location.href = 'index.html';
+                localStorage.removeItem("token");
+                window.location.href = "/";
             }
-
 
             // ══════════════════════════════════════════════
             //  APP STATE
@@ -436,7 +430,7 @@
             //  localStorage = fallback (works with file://)
             //  Both saved on every upload so data survives either way
             // ══════════════════════════════════════════════
-            const DB_NAME = "BridgerpayDB";
+            const DB_NAME = "bridgerpay";
             const DB_VER = 2;
             let idb = null;
             let IDB_OK = false;
@@ -625,23 +619,23 @@
                 } catch (e) {}
 
                 // Sync to Backend
-                const token = localStorage.getItem('token');
+                const token = localStorage.getItem("token");
                 if (token) {
                     try {
-                        await fetch('/api/transactions/batch', {
-                            method: 'POST',
+                        await fetch("/api/transactions/batch", {
+                            method: "POST",
                             headers: {
-                                'Content-Type': 'application/json',
-                                'x-auth-token': token
+                                "Content-Type": "application/json",
+                                "x-auth-token": token,
                             },
                             body: JSON.stringify({
                                 batchId: batchId,
                                 batchName: batchName,
-                                rows: newRows
-                            })
+                                rows: newRows,
+                            }),
                         });
                     } catch (err) {
-                        console.error('Failed to sync batch to backend', err);
+                        console.error("Failed to sync batch to backend", err);
                     }
                 }
             }
@@ -893,7 +887,9 @@
                 try {
                     // For multiple files, we'll sync each batch separately to match backend expectations
                     for (const batch of newBatches) {
-                        const batchRows = newRows.filter(r => r._uid === batch.uid);
+                        const batchRows = newRows.filter(
+                            (r) => r._uid === batch.uid,
+                        );
                         await saveAppend(batchRows, batch.name, batch.uid);
                     }
                     setSaveStatus("ok");
@@ -1349,11 +1345,11 @@
                 try {
                     await idbClearAll();
                     // Sync to Backend
-                    const token = localStorage.getItem('token');
+                    const token = localStorage.getItem("token");
                     if (token) {
-                        await fetch('/api/transactions', {
-                            method: 'DELETE',
-                            headers: { 'x-auth-token': token }
+                        await fetch("/api/transactions", {
+                            method: "DELETE",
+                            headers: { "x-auth-token": token },
                         });
                     }
                 } catch (e) {}
@@ -1389,11 +1385,11 @@
                 try {
                     await idbDelBatch(S.pendingDel);
                     // Sync to Backend
-                    const token = localStorage.getItem('token');
+                    const token = localStorage.getItem("token");
                     if (token) {
                         await fetch(`/api/transactions/batch/${S.pendingDel}`, {
-                            method: 'DELETE',
-                            headers: { 'x-auth-token': token }
+                            method: "DELETE",
+                            headers: { "x-auth-token": token },
                         });
                     }
                 } catch (e) {}
@@ -1502,40 +1498,56 @@
             (async function init() {
                 try {
                     let { rows, meta } = await loadSaved();
-                    
+
                     // If no local data, try backend
-                    if (!rows.length && localStorage.getItem('token')) {
-                        const token = localStorage.getItem('token');
-                        const res = await fetch('/api/transactions', {
-                            headers: { 'x-auth-token': token }
+                    if (!rows.length && localStorage.getItem("token")) {
+                        const token = localStorage.getItem("token");
+                        const res = await fetch("/api/transactions", {
+                            headers: { "x-auth-token": token },
                         });
                         if (res.ok) {
                             const transactions = await res.json();
                             if (transactions.length) {
-                                rows = transactions.map(t => ({
+                                rows = transactions.map((t) => ({
                                     ...t.data,
                                     _uid: t.batchId,
-                                    _src: t.batchName
+                                    _src: t.batchName,
                                 }));
                                 // Reconstruct batches
                                 const bMap = {};
-                                rows.forEach(r => {
+                                rows.forEach((r) => {
                                     if (!bMap[r._uid]) {
                                         bMap[r._uid] = {
                                             uid: r._uid,
                                             name: r._src,
                                             count: 0,
                                             date: new Date().toISOString(),
-                                            headers: Object.keys(r).filter(k => !k.startsWith('_'))
+                                            headers: Object.keys(r).filter(
+                                                (k) => !k.startsWith("_"),
+                                            ),
                                         };
                                     }
                                     bMap[r._uid].count++;
                                 });
                                 meta = {
                                     batches: Object.values(bMap),
-                                    cols: [...new Set(rows.flatMap(r => Object.keys(r).filter(k => !k.startsWith('_'))))],
-                                    dateCol: Object.keys(rows[0] || {}).find(k => !k.startsWith('_')) || "",
-                                    pspCol: Object.keys(rows[0] || {}).find(k => /psp/i.test(k)) || ""
+                                    cols: [
+                                        ...new Set(
+                                            rows.flatMap((r) =>
+                                                Object.keys(r).filter(
+                                                    (k) => !k.startsWith("_"),
+                                                ),
+                                            ),
+                                        ),
+                                    ],
+                                    dateCol:
+                                        Object.keys(rows[0] || {}).find(
+                                            (k) => !k.startsWith("_"),
+                                        ) || "",
+                                    pspCol:
+                                        Object.keys(rows[0] || {}).find((k) =>
+                                            /psp/i.test(k),
+                                        ) || "",
                                 };
                                 // Save locally
                                 S.rows = rows;
