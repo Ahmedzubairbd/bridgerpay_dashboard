@@ -1,0 +1,1578 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Bridgerpay Dashboard</title>
+
+        <link rel="stylesheet" href="style.css" />
+    </head>
+    <body>
+        <!-- ══ LOGIN SCREEN ══ -->
+        <div id="lockscreen">
+            <div id="lockbox">
+                <div class="lock-icon">🔒</div>
+                <h1>Bridgerpay Dashboard</h1>
+                <p>Enter your password to continue</p>
+                <input
+                    type="password"
+                    id="pw-input"
+                    placeholder="Password"
+                    onkeydown="if (event.key === 'Enter') tryLogin();"
+                    oninput="
+                        document.getElementById('lock-err').textContent = '';
+                        this.classList.remove('wrong');
+                    "
+                />
+                <button onclick="tryLogin()">Unlock →</button>
+                <div id="lock-err"></div>
+                <div id="lock-attempts"></div>
+            </div>
+        </div>
+
+        <!-- Loading overlay -->
+        <div id="overlay">
+            <div class="spinner"></div>
+            <p>Loading Bridgerpay Dashboard…</p>
+        </div>
+
+        <!-- Toast -->
+        <div id="toast"></div>
+
+        <!-- Modal: Clear all -->
+        <div class="modalbg" id="modal-clear">
+            <div class="modalbox">
+                <div class="modalicon">⚠️</div>
+                <div class="modaltitle">Clear ALL data?</div>
+                <div class="modalmsg" id="modal-clear-msg"></div>
+                <div class="modalbtns">
+                    <button
+                        class="btn btn-gray"
+                        onclick="closeModal('modal-clear')"
+                    >
+                        Cancel
+                    </button>
+                    <button class="btn btn-red" onclick="execClear()">
+                        Delete Everything
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Delete batch -->
+        <div class="modalbg" id="modal-del">
+            <div class="modalbox">
+                <div class="modalicon">🗑️</div>
+                <div class="modaltitle">Delete this batch?</div>
+                <div class="modalmsg" id="modal-del-msg"></div>
+                <div class="modalbtns">
+                    <button
+                        class="btn btn-gray"
+                        onclick="closeModal('modal-del')"
+                    >
+                        Cancel
+                    </button>
+                    <button class="btn btn-red" onclick="execDel()">
+                        Delete Batch
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Header -->
+        <div id="header">
+            <div id="logo">Bridgerpay <b>Dashboard</b></div>
+            <span class="hbadge hb-g" id="hdrbadge">💾 IndexedDB</span>
+            <span
+                class="hbadge hb-b"
+                id="rowbadge"
+                style="display: none"
+            ></span>
+            <span id="save-status"></span>
+            <div class="tabrow">
+                <button
+                    class="tabbt active"
+                    id="tab-data"
+                    onclick="switchTab('data')"
+                >
+                    📊 Data
+                </button>
+                <button class="tabbt" id="tab-up" onclick="switchTab('up')">
+                    📁 Uploads (0)
+                </button>
+            </div>
+        </div>
+
+        <!-- App -->
+        <div id="app">
+            <!-- DATA TAB -->
+            <div id="panel-data">
+                <!-- Drop zone -->
+                <div
+                    id="dropzone"
+                    onclick="document.getElementById('fileinput').click()"
+                    ondragover="
+                        event.preventDefault();
+                        this.classList.add('dragover');
+                    "
+                    ondragleave="this.classList.remove('dragover')"
+                    ondrop="
+                        this.classList.remove('dragover');
+                        handleDrop(event);
+                    "
+                >
+                    <div id="dz-icon">⬆️</div>
+                    <div style="flex: 1">
+                        <div id="dz-title">Upload CSV Files</div>
+                        <div id="dz-sub">
+                            Drop files here or click to browse — data is
+                            permanently saved to IndexedDB
+                        </div>
+                    </div>
+                    <div id="dz-info"></div>
+                </div>
+                <input
+                    type="file"
+                    id="fileinput"
+                    accept=".csv"
+                    multiple
+                    style="display: none"
+                    onchange="handleFiles(this.files)"
+                />
+
+                <!-- No data -->
+                <div id="nodata">
+                    <div class="icon">📂</div>
+                    <h2>No data yet</h2>
+                    <p>
+                        Upload your first CSV file above.<br />All data is saved
+                        to IndexedDB and persists between sessions.
+                    </p>
+                </div>
+
+                <!-- Dashboard (shown when data loaded) -->
+                <div id="dashboard" style="display: none">
+                    <!-- Stats -->
+                    <div id="stats">
+                        <div class="statcard">
+                            <div class="statval" id="st1">0</div>
+                            <div class="statlbl">Total Rows</div>
+                        </div>
+                        <div class="statcard">
+                            <div class="statval green" id="st2">0</div>
+                            <div class="statlbl">Filtered Rows</div>
+                        </div>
+                        <div class="statcard">
+                            <div class="statval" id="st3">0</div>
+                            <div class="statlbl">Unique PSPs</div>
+                        </div>
+                        <div class="statcard">
+                            <div class="statval" id="st4">0</div>
+                            <div class="statlbl">Batches Saved</div>
+                        </div>
+                        <div class="statcard">
+                            <div
+                                class="statval"
+                                id="st5"
+                                style="font-size: 13px"
+                            >
+                                —
+                            </div>
+                            <div class="statlbl">Date Column</div>
+                            <div class="statsub" id="st6"></div>
+                        </div>
+                    </div>
+
+                    <!-- Filter bar -->
+                    <div id="filterbar">
+                        <div id="filterrow">
+                            <!-- PSP dropdown -->
+                            <div id="pspwrap">
+                                <span id="psplabel">PSP Name</span>
+                                <div
+                                    id="psptrigger"
+                                    onclick="togglePSPPanel(event)"
+                                >
+                                    <span id="psptext">All PSPs</span>
+                                    <span id="psparrow">▼</span>
+                                </div>
+                                <div id="psppanel">
+                                    <input
+                                        id="pspsearch"
+                                        placeholder="Search PSP…"
+                                        oninput="renderPSPList()"
+                                        onclick="event.stopPropagation()"
+                                    />
+                                    <div id="pspctrl">
+                                        <button
+                                            class="psp-selall"
+                                            onclick="selectAllPSPs()"
+                                        >
+                                            ✓ Select All
+                                        </button>
+                                        <button
+                                            class="psp-clear"
+                                            onclick="clearPSPs()"
+                                        >
+                                            Clear
+                                        </button>
+                                    </div>
+                                    <div id="psplist"></div>
+                                    <div id="pspdone">
+                                        <button
+                                            class="btn btn-green sm"
+                                            onclick="closePSPPanel()"
+                                        >
+                                            Done
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Date From -->
+                            <div class="fgroup">
+                                <label id="dfromlbl">Date From</label>
+                                <input
+                                    type="date"
+                                    class="finput"
+                                    id="dfrom"
+                                    oninput="applyFilters()"
+                                />
+                            </div>
+
+                            <!-- Date To -->
+                            <div class="fgroup">
+                                <label>Date To</label>
+                                <input
+                                    type="date"
+                                    class="finput"
+                                    id="dto"
+                                    oninput="applyFilters()"
+                                />
+                            </div>
+
+                            <!-- Source -->
+                            <div class="fgroup">
+                                <label>Source Batch</label>
+                                <select
+                                    class="finput"
+                                    id="srcsel"
+                                    onchange="applyFilters()"
+                                >
+                                    <option value="all">All Uploads</option>
+                                </select>
+                            </div>
+
+                            <button
+                                class="btn btn-gray sm"
+                                id="clrfbtn"
+                                style="display: none; align-self: flex-end"
+                                onclick="clearFilters()"
+                            >
+                                ✕ Clear
+                            </button>
+                        </div>
+
+                        <!-- Active chips -->
+                        <div id="chiprow"></div>
+                    </div>
+
+                    <!-- Download bar -->
+                    <div id="dlbar">
+                        <span style="font-size: 20px">⬇️</span>
+                        <div>
+                            <div
+                                style="
+                                    font-weight: 800;
+                                    font-size: 13px;
+                                    color: #00d4a8;
+                                "
+                            >
+                                Download
+                            </div>
+                            <div
+                                style="
+                                    font-size: 9px;
+                                    color: #3a5e78;
+                                    letter-spacing: 1px;
+                                "
+                            >
+                                EXPORT AS CSV
+                            </div>
+                        </div>
+                        <button class="dlmain" onclick="dlFiltered()">
+                            ⬇ Download Filtered CSV
+                            <span class="dlcount" id="dlcnt">0 rows</span>
+                        </button>
+                        <button class="dlsec" onclick="dlAll()">
+                            ⬇ Full Dataset
+                            <span class="dlcount2" id="dlallcnt">0 rows</span>
+                        </button>
+                        <div id="perpspdl">
+                            <span
+                                style="
+                                    font-size: 9px;
+                                    color: #3a5e78;
+                                    letter-spacing: 1.2px;
+                                    text-transform: uppercase;
+                                    white-space: nowrap;
+                                "
+                                >By PSP:</span
+                            >
+                            <div
+                                id="perpspdllist"
+                                style="display: flex; gap: 6px; flex-wrap: wrap"
+                            ></div>
+                        </div>
+                        <div id="dlright">
+                            <span class="pglabel" id="pglbl">pg 1/1</span>
+                            <button
+                                class="btn btn-red sm"
+                                onclick="openClearModal()"
+                            >
+                                🗑 Clear All
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Table -->
+                    <div id="tablewrap">
+                        <div id="tablescroll">
+                            <table>
+                                <thead id="thead">
+                                    <tr></tr>
+                                </thead>
+                                <tbody id="tbody"></tbody>
+                            </table>
+                        </div>
+                        <div id="pagbar"></div>
+                    </div>
+                </div>
+                <!-- /dashboard -->
+            </div>
+            <!-- /panel-data -->
+
+            <!-- UPLOADS TAB -->
+            <div id="panel-up" style="display: none">
+                <div id="uptab">
+                    <div class="uptop">
+                        <div>
+                            <div class="uptitle">Upload History</div>
+                            <div class="upsub" id="upsub"></div>
+                        </div>
+                        <button
+                            class="btn btn-green"
+                            onclick="
+                                document.getElementById('fileinput').click()
+                            "
+                        >
+                            + Upload New CSV
+                        </button>
+                    </div>
+                    <div id="uplist"></div>
+                    <div
+                        id="upclr"
+                        style="
+                            display: none;
+                            margin-top: 16px;
+                            text-align: center;
+                        "
+                    >
+                        <button class="btn btn-red" onclick="openClearModal()">
+                            🗑 Clear All Data &amp; History
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- /app -->
+
+        <script>
+            // ══════════════════════════════════════════════
+            //  PASSWORD CONFIG  ← change this password
+            // ══════════════════════════════════════════════
+            const CORRECT_PASSWORD = "Bridgerpay2024!";
+            const SESSION_KEY = "bp_auth";
+            const MAX_ATTEMPTS = 5;
+            const LOCKOUT_MINUTES = 15;
+
+            // ── Login gate ──
+            (function checkAuth() {
+                // Already authenticated this session?
+                if (sessionStorage.getItem(SESSION_KEY) === "1") {
+                    document.getElementById("lockscreen").style.display =
+                        "none";
+                    return;
+                }
+                // Check for active lockout
+                const lockUntil = parseInt(
+                    localStorage.getItem("bp_lock_until") || "0",
+                    10,
+                );
+                if (Date.now() < lockUntil) {
+                    showLockout(lockUntil);
+                }
+            })();
+
+            function tryLogin() {
+                const input = document.getElementById("pw-input");
+                const errEl = document.getElementById("lock-err");
+
+                // Check lockout
+                const lockUntil = parseInt(
+                    localStorage.getItem("bp_lock_until") || "0",
+                    10,
+                );
+                if (Date.now() < lockUntil) {
+                    showLockout(lockUntil);
+                    return;
+                }
+
+                if (input.value === CORRECT_PASSWORD) {
+                    // ✓ Correct — grant session access
+                    sessionStorage.setItem(SESSION_KEY, "1");
+                    localStorage.removeItem("bp_attempts");
+                    localStorage.removeItem("bp_lock_until");
+                    document.getElementById("lockscreen").style.display =
+                        "none";
+                } else {
+                    // ✗ Wrong password
+                    input.value = "";
+                    input.classList.add("wrong");
+                    setTimeout(() => input.classList.remove("wrong"), 400);
+
+                    const attempts =
+                        parseInt(
+                            localStorage.getItem("bp_attempts") || "0",
+                            10,
+                        ) + 1;
+                    localStorage.setItem("bp_attempts", String(attempts));
+                    const remaining = MAX_ATTEMPTS - attempts;
+
+                    if (attempts >= MAX_ATTEMPTS) {
+                        const until = Date.now() + LOCKOUT_MINUTES * 60 * 1000;
+                        localStorage.setItem("bp_lock_until", String(until));
+                        localStorage.removeItem("bp_attempts");
+                        showLockout(until);
+                    } else {
+                        errEl.textContent = "Incorrect password.";
+                        document.getElementById("lock-attempts").textContent =
+                            `${remaining} attempt${remaining !== 1 ? "s" : ""} remaining before ${LOCKOUT_MINUTES}-min lockout`;
+                        input.focus();
+                    }
+                }
+            }
+
+            function showLockout(until) {
+                const input = document.getElementById("pw-input");
+                const errEl = document.getElementById("lock-err");
+                const attEl = document.getElementById("lock-attempts");
+                input.disabled = true;
+                document.querySelector("#lockbox button").disabled = true;
+                errEl.textContent = "Too many failed attempts.";
+
+                const tick = () => {
+                    const secs = Math.max(
+                        0,
+                        Math.ceil((until - Date.now()) / 1000),
+                    );
+                    const m = Math.floor(secs / 60),
+                        s = secs % 60;
+                    attEl.textContent = `Try again in ${m}:${String(s).padStart(2, "0")}`;
+                    if (secs > 0) setTimeout(tick, 1000);
+                    else {
+                        input.disabled = false;
+                        document.querySelector("#lockbox button").disabled =
+                            false;
+                        input.focus();
+                        errEl.textContent = "";
+                        attEl.textContent = "";
+                    }
+                };
+                tick();
+            }
+
+            // ══════════════════════════════════════════════
+            //  APP STATE
+            // ══════════════════════════════════════════════
+            const S = {
+                rows: [],
+                cols: [],
+                dateCol: "",
+                pspCol: "",
+                batches: [], // [{uid, name, count, date, headers}]
+                selPSPs: [],
+                dateFrom: "",
+                dateTo: "",
+                src: "all",
+                sortCol: "",
+                sortDir: "asc",
+                page: 1,
+                filtered: [],
+                pendingDel: null,
+                tab: "data",
+            };
+            const PER_PAGE = 50;
+
+            // ══════════════════════════════════════════════
+            //  STORAGE — dual layer: IndexedDB + localStorage
+            //  IndexedDB = primary (unlimited, Chrome http/https)
+            //  localStorage = fallback (works with file://)
+            //  Both saved on every upload so data survives either way
+            // ══════════════════════════════════════════════
+            const DB_NAME = "BridgerpayDB";
+            const DB_VER = 2;
+            let idb = null;
+            let IDB_OK = false;
+
+            /* ─ IndexedDB ─ */
+            function openIDB() {
+                if (idb) return Promise.resolve(idb);
+                return new Promise((ok, fail) => {
+                    const req = indexedDB.open(DB_NAME, DB_VER);
+                    req.onupgradeneeded = (e) => {
+                        const db = e.target.result;
+                        if (!db.objectStoreNames.contains("rows"))
+                            db.createObjectStore("rows", {
+                                keyPath: "_id",
+                                autoIncrement: true,
+                            });
+                        if (!db.objectStoreNames.contains("meta"))
+                            db.createObjectStore("meta", { keyPath: "k" });
+                    };
+                    req.onsuccess = (e) => {
+                        idb = e.target.result;
+                        IDB_OK = true;
+                        ok(idb);
+                    };
+                    req.onerror = () => fail(new Error("IDB unavailable"));
+                    req.onblocked = () => fail(new Error("IDB blocked"));
+                });
+            }
+            async function idbAppend(rows) {
+                const db = await openIDB();
+                return new Promise((ok, fail) => {
+                    const tx = db.transaction("rows", "readwrite"),
+                        st = tx.objectStore("rows");
+                    rows.forEach((r) => {
+                        const c = { ...r };
+                        delete c._id;
+                        st.add(c);
+                    });
+                    tx.oncomplete = ok;
+                    tx.onerror = (e) => fail(e.target.error);
+                });
+            }
+            async function idbLoadRows() {
+                const db = await openIDB();
+                return new Promise((ok, fail) => {
+                    const req = db
+                        .transaction("rows", "readonly")
+                        .objectStore("rows")
+                        .getAll();
+                    req.onsuccess = (e) => ok(e.target.result || []);
+                    req.onerror = (e) => fail(e.target.error);
+                });
+            }
+            async function idbDelBatch(uid) {
+                const db = await openIDB();
+                return new Promise((ok, fail) => {
+                    const tx = db.transaction("rows", "readwrite"),
+                        st = tx.objectStore("rows");
+                    const req = st.openCursor();
+                    req.onsuccess = (e) => {
+                        const c = e.target.result;
+                        if (c) {
+                            if (c.value._uid === uid) c.delete();
+                            c.continue();
+                        } else ok();
+                    };
+                    req.onerror = (e) => fail(e.target.error);
+                });
+            }
+            async function idbSaveMeta() {
+                const db = await openIDB();
+                return new Promise((ok, fail) => {
+                    const req = db
+                        .transaction("meta", "readwrite")
+                        .objectStore("meta")
+                        .put({
+                            k: "m",
+                            cols: S.cols,
+                            dateCol: S.dateCol,
+                            pspCol: S.pspCol,
+                            batches: S.batches,
+                        });
+                    req.onsuccess = ok;
+                    req.onerror = (e) => fail(e.target.error);
+                });
+            }
+            async function idbLoadMeta() {
+                const db = await openIDB();
+                return new Promise((ok, fail) => {
+                    const req = db
+                        .transaction("meta", "readonly")
+                        .objectStore("meta")
+                        .get("m");
+                    req.onsuccess = (e) => ok(e.target.result || null);
+                    req.onerror = (e) => fail(e.target.error);
+                });
+            }
+            async function idbClearAll() {
+                const db = await openIDB();
+                const clr = (s) =>
+                    new Promise((ok, fail) => {
+                        const r = db
+                            .transaction(s, "readwrite")
+                            .objectStore(s)
+                            .clear();
+                        r.onsuccess = ok;
+                        r.onerror = (e) => fail(e.target.error);
+                    });
+                return Promise.all([clr("rows"), clr("meta")]);
+            }
+
+            /* ─ localStorage fallback (chunked, 200 rows/key) ─ */
+            const LS_META = "bp_meta",
+                LS_NC = "bp_nc";
+            const CH = 200;
+            function lsSaveMeta() {
+                try {
+                    localStorage.setItem(
+                        LS_META,
+                        JSON.stringify({
+                            cols: S.cols,
+                            dateCol: S.dateCol,
+                            pspCol: S.pspCol,
+                            batches: S.batches,
+                        }),
+                    );
+                } catch (e) {}
+            }
+            function lsSaveRows() {
+                Object.keys(localStorage)
+                    .filter((k) => k.startsWith("bp_r_"))
+                    .forEach((k) => localStorage.removeItem(k));
+                let n = 0;
+                for (let i = 0; i < S.rows.length; i += CH) {
+                    try {
+                        localStorage.setItem(
+                            `bp_r_${n}`,
+                            JSON.stringify(S.rows.slice(i, i + CH)),
+                        );
+                        n++;
+                    } catch (e) {
+                        break;
+                    }
+                }
+                try {
+                    localStorage.setItem(LS_NC, String(n));
+                } catch (e) {}
+            }
+            function lsLoadAll() {
+                try {
+                    const m = localStorage.getItem(LS_META);
+                    if (!m) return null;
+                    const meta = JSON.parse(m);
+                    const nc = parseInt(localStorage.getItem(LS_NC) || "0", 10);
+                    let rows = [];
+                    for (let i = 0; i < nc; i++) {
+                        const c = localStorage.getItem(`bp_r_${i}`);
+                        if (c) rows = rows.concat(JSON.parse(c));
+                    }
+                    return rows.length ? { rows, meta } : null;
+                } catch (e) {
+                    return null;
+                }
+            }
+            function lsClearAll() {
+                Object.keys(localStorage)
+                    .filter(
+                        (k) =>
+                            k.startsWith("bp_r_") ||
+                            k === LS_META ||
+                            k === LS_NC,
+                    )
+                    .forEach((k) => localStorage.removeItem(k));
+            }
+
+            /* ─ Unified API ─ */
+            async function saveAppend(newRows) {
+                // localStorage always (works for file://)
+                lsSaveMeta();
+                lsSaveRows();
+                // IndexedDB also (better for large data, http/https)
+                try {
+                    await openIDB();
+                    await idbAppend(newRows);
+                    await idbSaveMeta();
+                } catch (e) {}
+            }
+            async function saveAll() {
+                lsSaveMeta();
+                lsSaveRows();
+                try {
+                    await openIDB();
+                    await idbSaveMeta();
+                } catch (e) {}
+            }
+            async function loadSaved() {
+                // Try IDB first
+                try {
+                    const [rows, meta] = await Promise.all([
+                        idbLoadRows(),
+                        idbLoadMeta(),
+                    ]);
+                    if (rows.length && meta)
+                        return {
+                            rows: rows.map((r) => {
+                                const c = { ...r };
+                                delete c._id;
+                                return c;
+                            }),
+                            meta,
+                        };
+                } catch (e) {
+                    IDB_OK = false;
+                }
+                // Fallback to localStorage
+                return lsLoadAll() || { rows: [], meta: null };
+            }
+
+            // ══════════════════════════════════════════════
+            //  CSV PARSER
+            // ══════════════════════════════════════════════
+            function parseCSV(text) {
+                const lines = text.trim().split(/\r?\n/);
+                if (lines.length < 2) return { headers: [], rows: [] };
+                const headers = lines[0]
+                    .split(",")
+                    .map((h) => h.trim().replace(/^"|"$/g, ""));
+                const rows = lines
+                    .slice(1)
+                    .filter((l) => l.trim())
+                    .map((line) => {
+                        const vals = [];
+                        let cur = "",
+                            inQ = false;
+                        for (let i = 0; i < line.length; i++) {
+                            const ch = line[i];
+                            if (ch === '"') {
+                                inQ = !inQ;
+                                continue;
+                            }
+                            if (ch === "," && !inQ) {
+                                vals.push(cur.trim());
+                                cur = "";
+                                continue;
+                            }
+                            cur += ch;
+                        }
+                        vals.push(cur.trim());
+                        const row = {};
+                        headers.forEach((h, i) => (row[h] = vals[i] ?? ""));
+                        return row;
+                    });
+                return { headers, rows };
+            }
+
+            // ══════════════════════════════════════════════
+            //  DATE NORMALISER
+            // ══════════════════════════════════════════════
+            function normDate(v) {
+                if (!v) return "";
+                const s = String(v).trim();
+                if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+                const m = s.match(/^(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{4})/);
+                if (m)
+                    return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+                const d = new Date(s);
+                if (!isNaN(d)) return d.toISOString().slice(0, 10);
+                return "";
+            }
+
+            // ══════════════════════════════════════════════
+            //  CSV DOWNLOAD
+            // ══════════════════════════════════════════════
+            function downloadCSV(rows, cols, filename) {
+                if (!rows.length) {
+                    toast("No data to download", "err");
+                    return;
+                }
+                const BOM = "\uFEFF";
+                const esc = (v) =>
+                    `"${(v == null ? "" : String(v)).replace(/"/g, '""')}"`;
+                const csv =
+                    BOM +
+                    cols.join(",") +
+                    "\r\n" +
+                    rows
+                        .map((r) => cols.map((c) => esc(r[c])).join(","))
+                        .join("\r\n");
+                const a = document.createElement("a");
+                a.href = URL.createObjectURL(
+                    new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+                );
+                a.download = filename.endsWith(".csv")
+                    ? filename
+                    : filename + ".csv";
+                a.style.display = "none";
+                document.body.appendChild(a);
+                a.click();
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(a.href);
+                }, 300);
+            }
+
+            function dlFiltered() {
+                const d = new Date().toISOString().slice(0, 10);
+                const pp = S.selPSPs.length
+                    ? "_" + S.selPSPs.join("-").replace(/\s+/g, "_")
+                    : "";
+                const dp =
+                    S.dateFrom || S.dateTo
+                        ? `_${S.dateFrom || "start"}_to_${S.dateTo || "end"}`
+                        : "";
+                downloadCSV(
+                    S.filtered,
+                    S.cols,
+                    `Bridgerpay_filtered${pp}${dp}_${d}.csv`,
+                );
+                toast(
+                    `✓ Downloading ${S.filtered.length.toLocaleString()} rows`,
+                );
+            }
+            function dlAll() {
+                downloadCSV(
+                    S.rows,
+                    S.cols,
+                    `Bridgerpay_full_${new Date().toISOString().slice(0, 10)}.csv`,
+                );
+                toast(`✓ Downloading ${S.rows.length.toLocaleString()} rows`);
+            }
+            function dlByPSP(psp) {
+                const r = S.filtered.filter((x) => x[S.pspCol] === psp);
+                downloadCSV(
+                    r,
+                    S.cols,
+                    `${psp.replace(/\s+/g, "_")}_${new Date().toISOString().slice(0, 10)}.csv`,
+                );
+                toast(`✓ ${r.length.toLocaleString()} rows for ${psp}`);
+            }
+
+            // ══════════════════════════════════════════════
+            //  FILE HANDLING
+            // ══════════════════════════════════════════════
+            function handleDrop(e) {
+                e.preventDefault();
+                handleFiles(e.dataTransfer.files);
+            }
+
+            function handleFiles(files) {
+                if (!files.length) return;
+                setBusy(true);
+                const arr = Array.from(files);
+                let done = 0;
+                const results = [];
+                arr.forEach((f) => {
+                    const r = new FileReader();
+                    r.onload = (e) => {
+                        results.push({ name: f.name, text: e.target.result });
+                        if (++done === arr.length) processFiles(results);
+                    };
+                    r.onerror = () => {
+                        if (++done === arr.length) processFiles(results);
+                    };
+                    r.readAsText(f);
+                });
+            }
+
+            function setBusy(on) {
+                document.getElementById("dz-icon").textContent = on
+                    ? "⏳"
+                    : "⬆️";
+                document.getElementById("dz-title").textContent = on
+                    ? "Saving to IndexedDB…"
+                    : "Upload CSV Files";
+                document.getElementById("dz-sub").textContent = on
+                    ? "Please wait, storing your data permanently…"
+                    : "Drop files here or click to browse — data is permanently saved to IndexedDB";
+            }
+
+            async function processFiles(results) {
+                let newRows = [],
+                    newBatches = [];
+                results.forEach(({ name, text }) => {
+                    const { headers, rows } = parseCSV(text);
+                    if (!rows.length) return;
+                    const uid =
+                        "b" +
+                        Date.now() +
+                        "_" +
+                        Math.random().toString(36).slice(2, 5);
+                    rows.forEach((r) => {
+                        r._uid = uid;
+                        r._src = name;
+                    });
+                    newRows = newRows.concat(rows);
+                    newBatches.push({
+                        uid,
+                        name,
+                        count: rows.length,
+                        date: new Date().toISOString(),
+                        headers,
+                    });
+                });
+
+                if (!newRows.length) {
+                    toast("No data rows found", "err");
+                    setBusy(false);
+                    return;
+                }
+
+                // Add to state
+                S.rows = S.rows.concat(newRows);
+                S.batches = S.batches.concat(newBatches);
+
+                // Rebuild column list (excluding internal fields)
+                const seen = new Set();
+                S.rows.forEach((r) =>
+                    Object.keys(r).forEach((k) => {
+                        if (k !== "_uid" && k !== "_src" && k !== "_id")
+                            seen.add(k);
+                    }),
+                );
+                S.cols = [...seen];
+
+                // Auto-detect date column (first column) and PSP column
+                if (!S.dateCol && newBatches[0]?.headers?.length)
+                    S.dateCol = newBatches[0].headers[0];
+                S.pspCol =
+                    S.cols.find((c) => /pspname|psp_name|psp/i.test(c)) || "";
+
+                // Save to both IndexedDB and localStorage
+                setSaveStatus("saving");
+                try {
+                    await saveAppend(newRows);
+                    setSaveStatus("ok");
+                } catch (e) {
+                    console.error("Save error:", e);
+                    setSaveStatus("err");
+                    toast(
+                        "⚠ Could not save. Data in memory only this session.",
+                        "err",
+                    );
+                }
+
+                setBusy(false);
+                applyFilters();
+                renderAll();
+                switchTab("data");
+                // Reset file input so same file can be uploaded again
+                document.getElementById("fileinput").value = "";
+                toast(
+                    `✓ ${newRows.length.toLocaleString()} rows saved from ${results.length} file${results.length > 1 ? "s" : ""}!`,
+                );
+            }
+
+            // ══════════════════════════════════════════════
+            //  FILTERS
+            // ══════════════════════════════════════════════
+            function applyFilters() {
+                S.dateFrom = document.getElementById("dfrom").value;
+                S.dateTo = document.getElementById("dto").value;
+                S.src = document.getElementById("srcsel").value;
+                S.page = 1;
+
+                let r = S.rows;
+                if (S.src !== "all") r = r.filter((x) => x._uid === S.src);
+                if (S.selPSPs.length && S.pspCol)
+                    r = r.filter((x) => S.selPSPs.includes(x[S.pspCol]));
+                if (S.dateCol && (S.dateFrom || S.dateTo)) {
+                    r = r.filter((x) => {
+                        const d = normDate(x[S.dateCol]);
+                        if (!d) return true;
+                        if (S.dateFrom && d < S.dateFrom) return false;
+                        if (S.dateTo && d > S.dateTo) return false;
+                        return true;
+                    });
+                }
+                if (S.sortCol) {
+                    r = [...r].sort((a, b) => {
+                        const va =
+                            S.sortCol === S.dateCol
+                                ? normDate(a[S.sortCol])
+                                : (a[S.sortCol] ?? "");
+                        const vb =
+                            S.sortCol === S.dateCol
+                                ? normDate(b[S.sortCol])
+                                : (b[S.sortCol] ?? "");
+                        return (
+                            (va < vb ? -1 : va > vb ? 1 : 0) *
+                            (S.sortDir === "asc" ? 1 : -1)
+                        );
+                    });
+                }
+                S.filtered = r;
+                drawDashboard();
+            }
+
+            function clearFilters() {
+                S.selPSPs = [];
+                S.dateFrom = "";
+                S.dateTo = "";
+                S.src = "all";
+                S.page = 1;
+                document.getElementById("dfrom").value = "";
+                document.getElementById("dto").value = "";
+                document.getElementById("srcsel").value = "all";
+                updatePSPTrigger();
+                applyFilters();
+            }
+
+            // ══════════════════════════════════════════════
+            //  PSP DROPDOWN
+            // ══════════════════════════════════════════════
+            function getPSPs() {
+                if (!S.pspCol) return [];
+                const src =
+                    S.src === "all"
+                        ? S.rows
+                        : S.rows.filter((r) => r._uid === S.src);
+                return [
+                    ...new Set(src.map((r) => r[S.pspCol]).filter(Boolean)),
+                ].sort();
+            }
+
+            function togglePSPPanel(e) {
+                e.stopPropagation();
+                const p = document.getElementById("psppanel");
+                if (p.classList.contains("open")) {
+                    closePSPPanel();
+                } else {
+                    p.classList.add("open");
+                    document.getElementById("psparrow").textContent = "▲";
+                    document.getElementById("pspsearch").value = "";
+                    renderPSPList();
+                    setTimeout(
+                        () => document.getElementById("pspsearch").focus(),
+                        40,
+                    );
+                }
+            }
+            function closePSPPanel() {
+                document.getElementById("psppanel").classList.remove("open");
+                document.getElementById("psparrow").textContent = "▼";
+                applyFilters();
+            }
+            function renderPSPList() {
+                const q = document
+                    .getElementById("pspsearch")
+                    .value.toLowerCase();
+                const list = getPSPs().filter(
+                    (p) => !q || p.toLowerCase().includes(q),
+                );
+                document.getElementById("psplist").innerHTML = list.length
+                    ? list
+                          .map((p) => {
+                              const ck = S.selPSPs.includes(p);
+                              return `<div class="pspitem${ck ? " checked" : ""}" onclick="togglePSP('${esc(p)}')">
+          <div class="pspchk">${ck ? "✓" : ""}</div>${eh(p)}</div>`;
+                          })
+                          .join("")
+                    : '<div style="padding:14px;text-align:center;color:#3a5e78;font-size:12px">No results</div>';
+                document.querySelector(".psp-selall").textContent =
+                    `✓ Select All (${getPSPs().length})`;
+            }
+            function togglePSP(p) {
+                const i = S.selPSPs.indexOf(p);
+                if (i > -1) S.selPSPs.splice(i, 1);
+                else S.selPSPs.push(p);
+                renderPSPList();
+                updatePSPTrigger();
+            }
+            function selectAllPSPs() {
+                S.selPSPs = getPSPs();
+                renderPSPList();
+                updatePSPTrigger();
+            }
+            function clearPSPs() {
+                S.selPSPs = [];
+                renderPSPList();
+                updatePSPTrigger();
+            }
+            function updatePSPTrigger() {
+                const t = document.getElementById("psptrigger");
+                const s = document.getElementById("psptext");
+                if (!S.selPSPs.length) {
+                    s.textContent = S.pspCol ? `All ${S.pspCol}s` : "All PSPs";
+                    t.classList.remove("active");
+                } else if (S.selPSPs.length === 1) {
+                    s.textContent = S.selPSPs[0];
+                    t.classList.add("active");
+                } else {
+                    s.textContent = `${S.selPSPs.length} selected`;
+                    t.classList.add("active");
+                }
+            }
+            document.addEventListener("click", (e) => {
+                const w = document.getElementById("pspwrap");
+                if (w && !w.contains(e.target)) {
+                    document
+                        .getElementById("psppanel")
+                        .classList.remove("open");
+                    document.getElementById("psparrow").textContent = "▼";
+                }
+            });
+
+            // ══════════════════════════════════════════════
+            //  SORT
+            // ══════════════════════════════════════════════
+            function sortBy(col) {
+                if (S.sortCol === col)
+                    S.sortDir = S.sortDir === "asc" ? "desc" : "asc";
+                else {
+                    S.sortCol = col;
+                    S.sortDir = "asc";
+                }
+                S.page = 1;
+                applyFilters();
+            }
+
+            // ══════════════════════════════════════════════
+            //  DRAW DASHBOARD
+            // ══════════════════════════════════════════════
+            function drawDashboard() {
+                const has = S.rows.length > 0;
+                document.getElementById("nodata").style.display = has
+                    ? "none"
+                    : "block";
+                document.getElementById("dashboard").style.display = has
+                    ? "block"
+                    : "none";
+                if (!has) return;
+
+                const f = S.filtered;
+                const tp = Math.max(1, Math.ceil(f.length / PER_PAGE));
+                if (S.page > tp) S.page = tp;
+                const pg = f.slice((S.page - 1) * PER_PAGE, S.page * PER_PAGE);
+
+                // Stats
+                document.getElementById("st1").textContent =
+                    S.rows.length.toLocaleString();
+                document.getElementById("st2").textContent =
+                    f.length.toLocaleString();
+                document.getElementById("st3").textContent = getPSPs().length;
+                document.getElementById("st4").textContent = S.batches.length;
+                document.getElementById("st5").textContent = S.dateCol || "—";
+                document.getElementById("st6").textContent =
+                    S.dateCol && S.rows[0]
+                        ? "e.g. " + String(S.rows[0][S.dateCol]).slice(0, 14)
+                        : "";
+
+                // Header badges
+                const rb = document.getElementById("rowbadge");
+                rb.textContent = S.rows.length.toLocaleString() + " ROWS SAVED";
+                rb.style.display = "inline";
+                document.getElementById("save-status").textContent =
+                    `💾 ${S.rows.length.toLocaleString()} rows`;
+
+                // PSP / date labels
+                if (S.pspCol) {
+                    document.getElementById("psplabel").textContent = S.pspCol;
+                    document.getElementById("psptext").textContent = S.selPSPs
+                        .length
+                        ? S.selPSPs.length === 1
+                            ? S.selPSPs[0]
+                            : S.selPSPs.length + " selected"
+                        : "All " + S.pspCol + "s";
+                }
+                document.getElementById("dfromlbl").textContent = S.dateCol
+                    ? `Date From (${S.dateCol})`
+                    : "Date From";
+
+                // Source select
+                const sel = document.getElementById("srcsel"),
+                    cv = sel.value;
+                sel.innerHTML =
+                    '<option value="all">All Uploads</option>' +
+                    S.batches
+                        .map(
+                            (b) =>
+                                `<option value="${b.uid}">${eh(b.name)}</option>`,
+                        )
+                        .join("");
+                if (S.batches.find((b) => b.uid === cv)) sel.value = cv;
+
+                // Upload badge
+                document.getElementById("dz-info").innerHTML = S.batches.length
+                    ? `<div style="color:#00d4a8">${S.batches.length} batch${S.batches.length > 1 ? "es" : ""} stored</div>
+       <div style="color:#3a5e78;margin-top:2px">Last: ${eh(S.batches[S.batches.length - 1].name)}</div>`
+                    : "";
+
+                // Clear filters button
+                const hasF =
+                    S.selPSPs.length ||
+                    S.dateFrom ||
+                    S.dateTo ||
+                    S.src !== "all";
+                document.getElementById("clrfbtn").style.display = hasF
+                    ? "inline-flex"
+                    : "none";
+
+                // Chips
+                const cr = document.getElementById("chiprow");
+                if (S.selPSPs.length || S.dateFrom || S.dateTo) {
+                    cr.style.display = "flex";
+                    cr.innerHTML =
+                        '<span style="font-size:9px;color:#3a5e78;letter-spacing:1.2px;text-transform:uppercase;margin-right:3px">Active:</span>' +
+                        S.selPSPs
+                            .map(
+                                (p) =>
+                                    `<span class="chip" style="background:rgba(0,212,168,.13);border:1px solid rgba(0,212,168,.35);color:#00d4a8">
+           <span>${eh(p)}</span>
+           <button class="chipdel" style="color:#00d4a8" onclick="removePSP('${esc(p)}')">×</button>
+         </span>`,
+                            )
+                            .join("") +
+                        (S.dateFrom || S.dateTo
+                            ? `<span class="chip" style="background:rgba(58,159,216,.13);border:1px solid rgba(58,159,216,.35);color:#3a9fd8">
+             <span>${S.dateFrom || "start"} → ${S.dateTo || "end"}</span>
+             <button class="chipdel" style="color:#3a9fd8" onclick="clearDates()">×</button>
+           </span>`
+                            : "");
+                } else {
+                    cr.style.display = "none";
+                }
+
+                // Download counts
+                document.getElementById("dlcnt").textContent =
+                    f.length.toLocaleString() + " rows";
+                document.getElementById("dlallcnt").textContent =
+                    S.rows.length.toLocaleString() + " rows";
+                const ppd = document.getElementById("perpspdl");
+                if (S.selPSPs.length) {
+                    ppd.style.display = "flex";
+                    document.getElementById("perpspdllist").innerHTML =
+                        S.selPSPs
+                            .map(
+                                (p) =>
+                                    `<button class="pspbtn" onclick="dlByPSP('${esc(p)}')">⬇ ${eh(p)}</button>`,
+                            )
+                            .join("");
+                } else ppd.style.display = "none";
+
+                document.getElementById("pglbl").textContent =
+                    `pg ${S.page}/${tp}`;
+
+                // Table head
+                document.getElementById("thead").innerHTML =
+                    "<tr>" +
+                    S.cols
+                        .map((c) => {
+                            const cls =
+                                c === S.pspCol
+                                    ? "psp"
+                                    : c === S.dateCol
+                                      ? "date"
+                                      : "";
+                            const arrow =
+                                S.sortCol === c
+                                    ? S.sortDir === "asc"
+                                        ? " ↑"
+                                        : " ↓"
+                                    : "";
+                            const pre =
+                                c === S.dateCol
+                                    ? "📅 "
+                                    : c === S.pspCol
+                                      ? "● "
+                                      : "";
+                            return `<th class="${cls}" onclick="sortBy('${esc(c)}')">${pre}${eh(c)}${arrow}</th>`;
+                        })
+                        .join("") +
+                    "</tr>";
+
+                // Table body
+                const tbody = document.getElementById("tbody");
+                if (!pg.length) {
+                    tbody.innerHTML = `<tr><td class="emptytd" colspan="${S.cols.length}">No rows match your filters.</td></tr>`;
+                } else {
+                    tbody.innerHTML = pg
+                        .map(
+                            (row, i) =>
+                                `<tr style="background:${i % 2 === 0 ? "transparent" : "#091521"}">` +
+                                S.cols
+                                    .map((c) => {
+                                        const cls =
+                                            c === S.pspCol
+                                                ? "psp"
+                                                : c === S.dateCol
+                                                  ? "date"
+                                                  : "";
+                                        const v = eh(String(row[c] ?? ""));
+                                        return `<td class="${cls}" title="${v}">${v}</td>`;
+                                    })
+                                    .join("") +
+                                "</tr>",
+                        )
+                        .join("");
+                }
+
+                // Pagination
+                let ph = `<button class="pgbtn" ${S.page === 1 ? "disabled" : ""} onclick="gp(1)">«</button>
+            <button class="pgbtn" ${S.page === 1 ? "disabled" : ""} onclick="gp(${S.page - 1})">‹</button>`;
+                const st = Math.max(1, Math.min(S.page - 3, tp - 6));
+                for (let p = st; p <= Math.min(st + 6, tp); p++)
+                    ph += `<button class="pgbtn${p === S.page ? " cur" : ""}" onclick="gp(${p})">${p}</button>`;
+                ph += `<button class="pgbtn" ${S.page === tp ? "disabled" : ""} onclick="gp(${S.page + 1})">›</button>
+         <button class="pgbtn" ${S.page === tp ? "disabled" : ""} onclick="gp(${tp})">»</button>
+         <span id="pginfo">${Math.min((S.page - 1) * PER_PAGE + 1, f.length)}–${Math.min(S.page * PER_PAGE, f.length)} / ${f.length}</span>`;
+                document.getElementById("pagbar").innerHTML = ph;
+            }
+
+            function gp(p) {
+                S.page = p;
+                drawDashboard();
+            }
+
+            // ══════════════════════════════════════════════
+            //  UPLOADS TAB
+            // ══════════════════════════════════════════════
+            function drawUploads() {
+                document.getElementById("upsub").textContent =
+                    `${S.batches.length} batch${S.batches.length !== 1 ? "es" : ""} · ${S.rows.length.toLocaleString()} total rows in IndexedDB`;
+                const ul = document.getElementById("uplist");
+                document.getElementById("upclr").style.display = S.batches
+                    .length
+                    ? "block"
+                    : "none";
+                if (!S.batches.length) {
+                    ul.innerHTML = `<div style="text-align:center;padding:50px 20px;color:#3a5e78">
+      <div style="font-size:38px;margin-bottom:10px">📭</div>
+      <div style="font-size:13px">No uploads yet. Go to the Data tab to upload your first CSV.</div></div>`;
+                    return;
+                }
+                ul.innerHTML = [...S.batches]
+                    .reverse()
+                    .map(
+                        (b) => `
+    <div class="upcard">
+      <div style="font-size:26px;flex-shrink:0">📄</div>
+      <div class="upcard-info">
+        <div class="upcard-name">${eh(b.name)}</div>
+        <div class="upcard-meta">
+          <span class="upcard-date">🕐 ${new Date(b.date).toLocaleString()}</span>
+          <span class="tag tag-g">${b.count?.toLocaleString()} rows</span>
+          <span class="tag tag-b">${b.headers?.length || 0} cols</span>
+        </div>
+      </div>
+      <div class="upcard-acts">
+        <button class="btn btn-gray sm" onclick="viewBatch('${b.uid}')">View</button>
+        <button class="btn btn-gray sm" onclick="exportBatch('${b.uid}','${esc(b.name)}')">⬇ Export</button>
+        <button class="btn btn-red sm" onclick="openDelModal('${b.uid}','${esc(b.name)}',${b.count})">🗑</button>
+      </div>
+    </div>`,
+                    )
+                    .join("");
+            }
+
+            function viewBatch(uid) {
+                S.src = uid;
+                document.getElementById("srcsel").value = uid;
+                switchTab("data");
+                applyFilters();
+            }
+            function exportBatch(uid, name) {
+                const rows = S.rows.filter((r) => r._uid === uid);
+                downloadCSV(
+                    rows,
+                    S.cols,
+                    `${name.replace(".csv", "")}_export.csv`,
+                );
+                toast(`✓ Exporting ${rows.length.toLocaleString()} rows`);
+            }
+
+            // ══════════════════════════════════════════════
+            //  MODALS
+            // ══════════════════════════════════════════════
+            function openClearModal() {
+                document.getElementById("modal-clear-msg").textContent =
+                    `This will permanently delete all ${S.rows.length.toLocaleString()} rows and ${S.batches.length} upload batches from IndexedDB. Cannot be undone.`;
+                document.getElementById("modal-clear").classList.add("open");
+            }
+            async function execClear() {
+                setSaveStatus("saving");
+                lsClearAll();
+                try {
+                    await idbClearAll();
+                } catch (e) {}
+                S.rows = [];
+                S.cols = [];
+                S.dateCol = "";
+                S.pspCol = "";
+                S.batches = [];
+                S.selPSPs = [];
+                S.dateFrom = "";
+                S.dateTo = "";
+                S.src = "all";
+                S.filtered = [];
+                document.getElementById("dfrom").value = "";
+                document.getElementById("dto").value = "";
+                document.getElementById("srcsel").innerHTML =
+                    '<option value="all">All Uploads</option>';
+                document.getElementById("rowbadge").style.display = "none";
+                document.getElementById("save-status").textContent = "";
+                updatePSPTrigger();
+                closeModal("modal-clear");
+                renderAll();
+                toast("All data cleared", "warn");
+            }
+            function openDelModal(uid, name, count) {
+                S.pendingDel = uid;
+                document.getElementById("modal-del-msg").textContent =
+                    `${name} — ${Number(count).toLocaleString()} rows will be permanently removed.`;
+                document.getElementById("modal-del").classList.add("open");
+            }
+            async function execDel() {
+                setSaveStatus("saving");
+                try {
+                    await idbDelBatch(S.pendingDel);
+                } catch (e) {}
+                S.rows = S.rows.filter((r) => r._uid !== S.pendingDel);
+                S.batches = S.batches.filter((b) => b.uid !== S.pendingDel);
+                if (S.src === S.pendingDel) {
+                    S.src = "all";
+                    document.getElementById("srcsel").value = "all";
+                }
+                await saveAll();
+                setSaveStatus("ok");
+                closeModal("modal-del");
+                applyFilters();
+                renderAll();
+                toast("Batch deleted");
+            }
+            function closeModal(id) {
+                document.getElementById(id).classList.remove("open");
+            }
+
+            // ══════════════════════════════════════════════
+            //  TABS
+            // ══════════════════════════════════════════════
+            function switchTab(t) {
+                S.tab = t;
+                document.getElementById("panel-data").style.display =
+                    t === "data" ? "block" : "none";
+                document.getElementById("panel-up").style.display =
+                    t === "up" ? "block" : "none";
+                document
+                    .getElementById("tab-data")
+                    .classList.toggle("active", t === "data");
+                document
+                    .getElementById("tab-up")
+                    .classList.toggle("active", t === "up");
+                document.getElementById("tab-up").textContent =
+                    `📁 Uploads (${S.batches.length})`;
+                if (t === "up") drawUploads();
+            }
+
+            // ══════════════════════════════════════════════
+            //  HELPERS
+            // ══════════════════════════════════════════════
+            function removePSP(p) {
+                S.selPSPs = S.selPSPs.filter((x) => x !== p);
+                updatePSPTrigger();
+                applyFilters();
+            }
+            function clearDates() {
+                S.dateFrom = "";
+                S.dateTo = "";
+                document.getElementById("dfrom").value = "";
+                document.getElementById("dto").value = "";
+                applyFilters();
+            }
+
+            function setSaveStatus(s) {
+                const el = document.getElementById("save-status");
+                if (s === "saving") {
+                    el.textContent = "⏳ Saving…";
+                    el.style.color = "#f5a623";
+                } else if (s === "ok") {
+                    el.textContent = "✓ Saved";
+                    el.style.color = "#00d4a8";
+                    setTimeout(() => {
+                        el.textContent = `💾 ${S.rows.length.toLocaleString()} rows`;
+                        el.style.color = "#00d4a8";
+                    }, 2000);
+                } else {
+                    el.textContent = "⚠ Save error";
+                    el.style.color = "#ff6b85";
+                }
+            }
+
+            let toastTimer;
+            function toast(msg, type = "ok") {
+                const t = document.getElementById("toast");
+                t.textContent = msg;
+                t.className = "t-" + type;
+                t.style.display = "block";
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => (t.style.display = "none"), 3200);
+            }
+
+            function eh(s) {
+                return String(s)
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;");
+            }
+            function esc(s) {
+                return String(s).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+            }
+
+            function renderAll() {
+                applyFilters();
+                document.getElementById("tab-up").textContent =
+                    `📁 Uploads (${S.batches.length})`;
+                if (S.tab === "up") drawUploads();
+            }
+
+            // ══════════════════════════════════════════════
+            //  INIT — load from storage, then render
+            // ══════════════════════════════════════════════
+            (async function init() {
+                try {
+                    const { rows, meta } = await loadSaved();
+                    if (rows.length) S.rows = rows;
+                    if (meta) {
+                        S.cols = meta.cols || [];
+                        S.dateCol = meta.dateCol || "";
+                        S.pspCol = meta.pspCol || "";
+                        S.batches = meta.batches || [];
+                    }
+                    // Show which storage engine is active
+                    const badge = document.getElementById("hdrbadge");
+                    if (IDB_OK) {
+                        badge.textContent = "💾 IndexedDB";
+                        badge.title =
+                            "Data saved to IndexedDB (unlimited storage)";
+                    } else {
+                        badge.textContent = "💾 localStorage";
+                        badge.className = "hbadge hb-b";
+                        badge.title =
+                            "IndexedDB unavailable — using localStorage fallback";
+                    }
+                    if (S.rows.length)
+                        document.getElementById("save-status").textContent =
+                            `💾 ${S.rows.length.toLocaleString()} rows restored`;
+                } catch (e) {
+                    console.error("Init error:", e);
+                }
+                document.getElementById("overlay").style.display = "none";
+                renderAll();
+            })();
+        </script>
+    </body>
+</html>
