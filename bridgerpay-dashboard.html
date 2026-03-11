@@ -8,27 +8,7 @@
         <link rel="stylesheet" href="style.css" />
     </head>
     <body>
-        <!-- ══ LOGIN SCREEN ══ -->
-        <div id="lockscreen">
-            <div id="lockbox">
-                <div class="lock-icon">🔒</div>
-                <h1>Bridgerpay Dashboard</h1>
-                <p>Enter your password to continue</p>
-                <input
-                    type="password"
-                    id="pw-input"
-                    placeholder="Password"
-                    onkeydown="if (event.key === 'Enter') tryLogin();"
-                    oninput="
-                        document.getElementById('lock-err').textContent = '';
-                        this.classList.remove('wrong');
-                    "
-                />
-                <button onclick="tryLogin()">Unlock →</button>
-                <div id="lock-err"></div>
-                <div id="lock-attempts"></div>
-            </div>
-        </div>
+
 
         <!-- Loading overlay -->
         <div id="overlay">
@@ -97,11 +77,22 @@
                 >
                     📊 Data
                 </button>
-                <button class="tabbt" id="tab-up" onclick="switchTab('up')">
+                <button
+                    class="tabbt"
+                    id="tab-up"
+                    onclick="switchTab('up')"
+                >
                     📁 Uploads (0)
                 </button>
-            </div>
-        </div>
+                <button
+                    class="btn btn-red sm"
+                    style="margin-left: 10px;"
+                    onclick="logout()"
+                >
+                    Logout
+                </button>
+                </div>
+                </div>
 
         <!-- App -->
         <div id="app">
@@ -388,109 +379,34 @@
         <!-- /app -->
 
         <script>
-            // ══════════════════════════════════════════════
-            //  PASSWORD CONFIG  ← change this password
-            // ══════════════════════════════════════════════
-            const CORRECT_PASSWORD = "Bridgerpay2024!";
-            const SESSION_KEY = "bp_auth";
-            const MAX_ATTEMPTS = 5;
-            const LOCKOUT_MINUTES = 15;
-
-            // ── Login gate ──
-            (function checkAuth() {
-                // Already authenticated this session?
-                if (sessionStorage.getItem(SESSION_KEY) === "1") {
-                    document.getElementById("lockscreen").style.display =
-                        "none";
+            // ── Auth Check ──
+            (async function checkAuth() {
+                const token = localStorage.getItem('token');
+                if (!token) {
+                    window.location.href = 'index.html';
                     return;
                 }
-                // Check for active lockout
-                const lockUntil = parseInt(
-                    localStorage.getItem("bp_lock_until") || "0",
-                    10,
-                );
-                if (Date.now() < lockUntil) {
-                    showLockout(lockUntil);
+
+                try {
+                    const res = await fetch('/api/user', {
+                        headers: { 'x-auth-token': token }
+                    });
+                    if (res.ok) {
+                        const user = await res.json();
+                        document.getElementById('logo').innerHTML = `Bridgerpay <b>Dashboard</b> <span style="font-size:12px; color:#3a5e78; font-weight:normal; margin-left:10px;">Welcome, ${user.name}</span>`;
+                    } else {
+                        logout();
+                    }
+                } catch (err) {
+                    console.error('Failed to fetch user', err);
                 }
             })();
 
-            function tryLogin() {
-                const input = document.getElementById("pw-input");
-                const errEl = document.getElementById("lock-err");
-
-                // Check lockout
-                const lockUntil = parseInt(
-                    localStorage.getItem("bp_lock_until") || "0",
-                    10,
-                );
-                if (Date.now() < lockUntil) {
-                    showLockout(lockUntil);
-                    return;
-                }
-
-                if (input.value === CORRECT_PASSWORD) {
-                    // ✓ Correct — grant session access
-                    sessionStorage.setItem(SESSION_KEY, "1");
-                    localStorage.removeItem("bp_attempts");
-                    localStorage.removeItem("bp_lock_until");
-                    document.getElementById("lockscreen").style.display =
-                        "none";
-                } else {
-                    // ✗ Wrong password
-                    input.value = "";
-                    input.classList.add("wrong");
-                    setTimeout(() => input.classList.remove("wrong"), 400);
-
-                    const attempts =
-                        parseInt(
-                            localStorage.getItem("bp_attempts") || "0",
-                            10,
-                        ) + 1;
-                    localStorage.setItem("bp_attempts", String(attempts));
-                    const remaining = MAX_ATTEMPTS - attempts;
-
-                    if (attempts >= MAX_ATTEMPTS) {
-                        const until = Date.now() + LOCKOUT_MINUTES * 60 * 1000;
-                        localStorage.setItem("bp_lock_until", String(until));
-                        localStorage.removeItem("bp_attempts");
-                        showLockout(until);
-                    } else {
-                        errEl.textContent = "Incorrect password.";
-                        document.getElementById("lock-attempts").textContent =
-                            `${remaining} attempt${remaining !== 1 ? "s" : ""} remaining before ${LOCKOUT_MINUTES}-min lockout`;
-                        input.focus();
-                    }
-                }
+            function logout() {
+                localStorage.removeItem('token');
+                window.location.href = 'index.html';
             }
 
-            function showLockout(until) {
-                const input = document.getElementById("pw-input");
-                const errEl = document.getElementById("lock-err");
-                const attEl = document.getElementById("lock-attempts");
-                input.disabled = true;
-                document.querySelector("#lockbox button").disabled = true;
-                errEl.textContent = "Too many failed attempts.";
-
-                const tick = () => {
-                    const secs = Math.max(
-                        0,
-                        Math.ceil((until - Date.now()) / 1000),
-                    );
-                    const m = Math.floor(secs / 60),
-                        s = secs % 60;
-                    attEl.textContent = `Try again in ${m}:${String(s).padStart(2, "0")}`;
-                    if (secs > 0) setTimeout(tick, 1000);
-                    else {
-                        input.disabled = false;
-                        document.querySelector("#lockbox button").disabled =
-                            false;
-                        input.focus();
-                        errEl.textContent = "";
-                        attEl.textContent = "";
-                    }
-                };
-                tick();
-            }
 
             // ══════════════════════════════════════════════
             //  APP STATE
@@ -697,7 +613,7 @@
             }
 
             /* ─ Unified API ─ */
-            async function saveAppend(newRows) {
+            async function saveAppend(newRows, batchName, batchId) {
                 // localStorage always (works for file://)
                 lsSaveMeta();
                 lsSaveRows();
@@ -707,6 +623,27 @@
                     await idbAppend(newRows);
                     await idbSaveMeta();
                 } catch (e) {}
+
+                // Sync to Backend
+                const token = localStorage.getItem('token');
+                if (token) {
+                    try {
+                        await fetch('/api/transactions/batch', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'x-auth-token': token
+                            },
+                            body: JSON.stringify({
+                                batchId: batchId,
+                                batchName: batchName,
+                                rows: newRows
+                            })
+                        });
+                    } catch (err) {
+                        console.error('Failed to sync batch to backend', err);
+                    }
+                }
             }
             async function saveAll() {
                 lsSaveMeta();
@@ -951,16 +888,20 @@
                 S.pspCol =
                     S.cols.find((c) => /pspname|psp_name|psp/i.test(c)) || "";
 
-                // Save to both IndexedDB and localStorage
+                // Save to both IndexedDB, localStorage, and Backend
                 setSaveStatus("saving");
                 try {
-                    await saveAppend(newRows);
+                    // For multiple files, we'll sync each batch separately to match backend expectations
+                    for (const batch of newBatches) {
+                        const batchRows = newRows.filter(r => r._uid === batch.uid);
+                        await saveAppend(batchRows, batch.name, batch.uid);
+                    }
                     setSaveStatus("ok");
                 } catch (e) {
                     console.error("Save error:", e);
                     setSaveStatus("err");
                     toast(
-                        "⚠ Could not save. Data in memory only this session.",
+                        "⚠ Could not save to backend. Data in local storage only.",
                         "err",
                     );
                 }
@@ -1407,6 +1348,14 @@
                 lsClearAll();
                 try {
                     await idbClearAll();
+                    // Sync to Backend
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        await fetch('/api/transactions', {
+                            method: 'DELETE',
+                            headers: { 'x-auth-token': token }
+                        });
+                    }
                 } catch (e) {}
                 S.rows = [];
                 S.cols = [];
@@ -1427,7 +1376,7 @@
                 updatePSPTrigger();
                 closeModal("modal-clear");
                 renderAll();
-                toast("All data cleared", "warn");
+                toast("All data cleared (including backend)", "warn");
             }
             function openDelModal(uid, name, count) {
                 S.pendingDel = uid;
@@ -1439,6 +1388,14 @@
                 setSaveStatus("saving");
                 try {
                     await idbDelBatch(S.pendingDel);
+                    // Sync to Backend
+                    const token = localStorage.getItem('token');
+                    if (token) {
+                        await fetch(`/api/transactions/batch/${S.pendingDel}`, {
+                            method: 'DELETE',
+                            headers: { 'x-auth-token': token }
+                        });
+                    }
                 } catch (e) {}
                 S.rows = S.rows.filter((r) => r._uid !== S.pendingDel);
                 S.batches = S.batches.filter((b) => b.uid !== S.pendingDel);
@@ -1451,7 +1408,7 @@
                 closeModal("modal-del");
                 applyFilters();
                 renderAll();
-                toast("Batch deleted");
+                toast("Batch deleted (including backend)");
             }
             function closeModal(id) {
                 document.getElementById(id).classList.remove("open");
@@ -1544,8 +1501,55 @@
             // ══════════════════════════════════════════════
             (async function init() {
                 try {
-                    const { rows, meta } = await loadSaved();
-                    if (rows.length) S.rows = rows;
+                    let { rows, meta } = await loadSaved();
+                    
+                    // If no local data, try backend
+                    if (!rows.length && localStorage.getItem('token')) {
+                        const token = localStorage.getItem('token');
+                        const res = await fetch('/api/transactions', {
+                            headers: { 'x-auth-token': token }
+                        });
+                        if (res.ok) {
+                            const transactions = await res.json();
+                            if (transactions.length) {
+                                rows = transactions.map(t => ({
+                                    ...t.data,
+                                    _uid: t.batchId,
+                                    _src: t.batchName
+                                }));
+                                // Reconstruct batches
+                                const bMap = {};
+                                rows.forEach(r => {
+                                    if (!bMap[r._uid]) {
+                                        bMap[r._uid] = {
+                                            uid: r._uid,
+                                            name: r._src,
+                                            count: 0,
+                                            date: new Date().toISOString(),
+                                            headers: Object.keys(r).filter(k => !k.startsWith('_'))
+                                        };
+                                    }
+                                    bMap[r._uid].count++;
+                                });
+                                meta = {
+                                    batches: Object.values(bMap),
+                                    cols: [...new Set(rows.flatMap(r => Object.keys(r).filter(k => !k.startsWith('_'))))],
+                                    dateCol: Object.keys(rows[0] || {}).find(k => !k.startsWith('_')) || "",
+                                    pspCol: Object.keys(rows[0] || {}).find(k => /psp/i.test(k)) || ""
+                                };
+                                // Save locally
+                                S.rows = rows;
+                                S.batches = meta.batches;
+                                S.cols = meta.cols;
+                                S.dateCol = meta.dateCol;
+                                S.pspCol = meta.pspCol;
+                                await saveAll();
+                            }
+                        }
+                    } else if (rows.length) {
+                        S.rows = rows;
+                    }
+
                     if (meta) {
                         S.cols = meta.cols || [];
                         S.dateCol = meta.dateCol || "";
