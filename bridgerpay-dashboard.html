@@ -6,6 +6,13 @@
         <title>Bridgerpay Dashboard</title>
 
         <link rel="stylesheet" href="style.css" />
+        <script>
+            // Apply theme immediately to prevent flash
+            (function() {
+                const savedTheme = localStorage.getItem('theme') || 'dark';
+                document.documentElement.setAttribute('data-theme', savedTheme);
+            })();
+        </script>
     </head>
     <body>
         <!-- Loading overlay -->
@@ -16,74 +23,32 @@
 
         <!-- Toast -->
         <div id="toast"></div>
-
-        <!-- Modal: Clear all -->
-        <div class="modalbg" id="modal-clear">
-            <div class="modalbox">
-                <div class="modalicon">⚠️</div>
-                <div class="modaltitle">Clear ALL data?</div>
-                <div class="modalmsg" id="modal-clear-msg"></div>
-                <div class="modalbtns">
-                    <button
-                        class="btn btn-gray"
-                        onclick="closeModal('modal-clear')"
-                    >
-                        Cancel
-                    </button>
-                    <button class="btn btn-red" onclick="execClear()">
-                        Delete Everything
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Modal: Delete batch -->
-        <div class="modalbg" id="modal-del">
-            <div class="modalbox">
-                <div class="modalicon">🗑️</div>
-                <div class="modaltitle">Delete this batch?</div>
-                <div class="modalmsg" id="modal-del-msg"></div>
-                <div class="modalbtns">
-                    <button
-                        class="btn btn-gray"
-                        onclick="closeModal('modal-del')"
-                    >
-                        Cancel
-                    </button>
-                    <button class="btn btn-red" onclick="execDel()">
-                        Delete Batch
-                    </button>
-                </div>
-            </div>
-        </div>
-
         <!-- Header -->
         <div id="header">
-            <div id="logo">Bridgerpay <b>Dashboard</b></div>
-            <span class="hbadge hb-g" id="hdrbadge">💾 IndexedDB</span>
-            <span
-                class="hbadge hb-b"
-                id="rowbadge"
-                style="display: none"
-            ></span>
-            <span id="save-status"></span>
+            <div id="logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="icon-pulse">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                Bridgerpay <b>Dashboard</b>
+            </div>
+            <div class="header-center">
+                <span class="hbadge hb-g" id="hdrbadge">Index</span>
+                <span class="hbadge hb-b hidden" id="rowbadge"></span>
+                <span id="save-status"></span>
+            </div>
             <div class="tabrow">
-                <button
-                    class="tabbt active"
-                    id="tab-data"
-                    onclick="switchTab('data')"
-                >
-                    📊 Data
+                <button class="nav-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle Theme">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M17.66 6.34l1.42-1.42"/></svg>
                 </button>
-                <button class="tabbt" id="tab-up" onclick="switchTab('up')">
-                    📁 Uploads (0)
+                <button class="nav-btn active" id="tab-data" onclick="switchTab('data')" title="Dashboard Data">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
                 </button>
-                <button
-                    class="btn btn-red sm"
-                    style="margin-left: 10px"
-                    onclick="logout()"
-                >
-                    Logout
+                <button class="nav-btn" id="tab-up" onclick="switchTab('up')" title="Upload History">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    <span id="up-count-badge">0</span>
+                </button>
+                <button class="nav-btn logout-btn" onclick="logout()" title="Logout">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 </button>
             </div>
         </div>
@@ -106,15 +71,18 @@
                         handleDrop(event);
                     "
                 >
-                    <div id="dz-icon">⬆️</div>
-                    <div style="flex: 1">
-                        <div id="dz-title">Upload CSV Files</div>
-                        <div id="dz-sub">
-                            Drop files here or click to browse — data is
-                            permanently saved to IndexedDB
+                    <div class="dz-content">
+                        <div id="dz-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M10 4H4C2.89543 4 2 4.89543 2 6V18C2 19.1046 2.89543 20 4 20H20C21.1046 20 22 19.1046 22 18V8C22 6.89543 21.1046 6 20 6H12L10 4Z" fill="#422AFB" fill-opacity="0.1" stroke="#422AFB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                <path d="M12 10V16M12 10L9 13M12 10L15 13" stroke="#422AFB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
                         </div>
+                        <div id="dz-title">Drag and drop CSV files</div>
+                        <div id="dz-sub">Data is permanently saved to IndexedDB</div>
+                        <div class="dz-separator"><span>OR</span></div>
+                        <button class="btn btn-purple-outline sm">Browse Files</button>
                     </div>
-                    <div id="dz-info"></div>
                 </div>
                 <input
                     type="file"
@@ -125,52 +93,36 @@
                     onchange="handleFiles(this.files)"
                 />
 
-                <!-- No data -->
-                <div id="nodata">
-                    <div class="icon">📂</div>
-                    <h2>No data yet</h2>
-                    <p>
-                        Upload your first CSV file above.<br />All data is saved
-                        to IndexedDB and persists between sessions.
+                <!-- No data state -->
+                <div id="nodata" class="neumorph-card hidden-element">
+                    <div class="icon-pulse dz-icon-large">📂</div>
+                    <h2 class="nodata-title">No data yet</h2>
+                    <p class="nodata-p">
+                        Upload your first CSV file above to start analyzing your Bridgerpay data. Everything is saved securely in your browser.
                     </p>
                 </div>
 
-                <!-- Dashboard (shown when data loaded) -->
-                <div id="dashboard" style="display: none">
-                    <!-- Stats -->
-                    <div id="stats">
-                        <div class="statcard">
-                            <div class="statval" id="st1">0</div>
-                            <div class="statlbl">Total Rows</div>
-                        </div>
-                        <div class="statcard">
-                            <div class="statval green" id="st2">0</div>
-                            <div class="statlbl">Filtered Rows</div>
-                        </div>
-                        <div class="statcard">
-                            <div class="statval" id="st3">0</div>
-                            <div class="statlbl">Unique PSPs</div>
-                        </div>
-                        <div class="statcard">
-                            <div class="statval" id="st4">0</div>
-                            <div class="statlbl">Batches Saved</div>
-                        </div>
-                        <div class="statcard">
-                            <div
-                                class="statval"
-                                id="st5"
-                                style="font-size: 13px"
-                            >
-                                —
-                            </div>
-                            <div class="statlbl">Date Column</div>
-                            <div class="statsub" id="st6"></div>
-                        </div>
-                    </div>
+                <!-- Dashboard Content -->
+                <div id="dashboard" class="hidden-element">
+                    <!-- Stats Grid -->
+                    <div id="stats"></div>
 
                     <!-- Filter bar -->
                     <div id="filterbar">
                         <div id="filterrow">
+                            <!-- Global Search -->
+                            <div class="fgroup" style="flex: 2; min-width: 300px;">
+                                <label>Search Records</label>
+                                <div style="position: relative;">
+                                    <input
+                                        id="globalsearch"
+                                        class="finput"
+                                        placeholder="Search anything..."
+                                        oninput="applyFilters()"
+                                    />
+                                    <svg style="position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                </div>
+                            </div>
                             <!-- PSP dropdown -->
                             <div id="pspwrap">
                                 <span id="psplabel">PSP Name</span>
@@ -217,7 +169,7 @@
                             <!-- Date From -->
                             <div class="fgroup">
                                 <label id="dfromlbl">Date From</label>
-                                <input
+                                <input label="Date From"
                                     type="date"
                                     class="finput"
                                     id="dfrom"
@@ -340,21 +292,10 @@
             <!-- UPLOADS TAB -->
             <div id="panel-up" style="display: none">
                 <div id="uptab">
-                    <div class="uptop">
-                        <div>
-                            <div class="uptitle">Upload History</div>
-                            <div class="upsub" id="upsub"></div>
-                        </div>
-                        <button
-                            class="btn btn-green"
-                            onclick="
-                                document.getElementById('fileinput').click()
-                            "
-                        >
-                            + Upload New CSV
-                        </button>
+                    <div class="uptab-header">
+                        <h2 class="uptab-title">Uploaded Files</h2>
                     </div>
-                    <div id="uplist"></div>
+                    <div id="uplist" class="file-grid"></div>
                     <div
                         id="upclr"
                         style="
@@ -388,7 +329,10 @@
                     if (res.ok) {
                         const user = await res.json();
                         document.getElementById("logo").innerHTML =
-                            `Bridgerpay <b>Dashboard</b> <span style="font-size:12px; color:#3a5e78; font-weight:normal; margin-left:10px;">Welcome, ${user.name}</span>`;
+                            `Bridgerpay <b>Dashboard</b> 
+                            <span style="font-size:12px; color:var(--text-primary); font-weight:normal; margin-left:10px;">
+                                Welcome, ${user.name}
+                            </span>`;
                     } else {
                         logout();
                     }
@@ -400,6 +344,13 @@
             function logout() {
                 localStorage.removeItem("token");
                 window.location.href = "/";
+            }
+
+            function toggleTheme() {
+                const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', newTheme);
+                localStorage.setItem('theme', newTheme);
             }
 
             // ══════════════════════════════════════════════
@@ -867,20 +818,40 @@
                 S.batches = S.batches.concat(newBatches);
 
                 // Rebuild column list (excluding internal fields)
+                // We want to maintain some order, so we'll collect from rows but keep them in order of appearance
                 const seen = new Set();
+                const orderedCols = [];
                 S.rows.forEach((r) =>
                     Object.keys(r).forEach((k) => {
-                        if (k !== "_uid" && k !== "_src" && k !== "_id")
+                        if (k !== "_uid" && k !== "_src" && k !== "_id" && !seen.has(k)) {
                             seen.add(k);
+                            orderedCols.push(k);
+                        }
                     }),
                 );
-                S.cols = [...seen];
+                S.cols = orderedCols;
 
-                // Auto-detect date column (first column) and PSP column
-                if (!S.dateCol && newBatches[0]?.headers?.length)
-                    S.dateCol = newBatches[0].headers[0];
-                S.pspCol =
-                    S.cols.find((c) => /pspname|psp_name|psp/i.test(c)) || "";
+                // Improved auto-detection for Date Column
+                if (!S.dateCol) {
+                    const dateKeywords = ["date", "time", "created", "timestamp", "period"];
+                    // Priority 1: Check if any column name matches keywords
+                    let foundDate = S.cols.find(c => dateKeywords.some(k => c.toLowerCase().includes(k)));
+                    
+                    // Priority 2: Fallback to first column if it looks like a date in the first row
+                    if (!foundDate && S.rows.length > 0 && S.cols.length > 0) {
+                        const firstVal = String(S.rows[0][S.cols[0]]);
+                        if (normDate(firstVal)) foundDate = S.cols[0];
+                    }
+                    
+                    if (foundDate) S.dateCol = foundDate;
+                }
+
+                // Improved auto-detection for PSP Column
+                if (!S.pspCol) {
+                    const pspKeywords = ["psp", "provider", "gateway", "vendor", "method", "processor", "acquirer"];
+                    const foundPsp = S.cols.find(c => pspKeywords.some(k => c.toLowerCase().includes(k)));
+                    if (foundPsp) S.pspCol = foundPsp;
+                }
 
                 // Save to both IndexedDB, localStorage, and Backend
                 setSaveStatus("saving");
@@ -920,12 +891,23 @@
                 S.dateFrom = document.getElementById("dfrom").value;
                 S.dateTo = document.getElementById("dto").value;
                 S.src = document.getElementById("srcsel").value;
+                const q = document.getElementById("globalsearch").value.toLowerCase();
                 S.page = 1;
 
                 let r = S.rows;
                 if (S.src !== "all") r = r.filter((x) => x._uid === S.src);
                 if (S.selPSPs.length && S.pspCol)
                     r = r.filter((x) => S.selPSPs.includes(x[S.pspCol]));
+                
+                if (q) {
+                    r = r.filter(row => {
+                        return Object.entries(row).some(([k, v]) => {
+                            if (k.startsWith("_")) return false;
+                            return String(v ?? "").toLowerCase().includes(q);
+                        });
+                    });
+                }
+
                 if (S.dateCol && (S.dateFrom || S.dateTo)) {
                     r = r.filter((x) => {
                         const d = normDate(x[S.dateCol]);
@@ -964,6 +946,7 @@
                 document.getElementById("dfrom").value = "";
                 document.getElementById("dto").value = "";
                 document.getElementById("srcsel").value = "all";
+                document.getElementById("globalsearch").value = "";
                 updatePSPTrigger();
                 applyFilters();
             }
@@ -1096,17 +1079,46 @@
                 const pg = f.slice((S.page - 1) * PER_PAGE, S.page * PER_PAGE);
 
                 // Stats
-                document.getElementById("st1").textContent =
-                    S.rows.length.toLocaleString();
-                document.getElementById("st2").textContent =
-                    f.length.toLocaleString();
-                document.getElementById("st3").textContent = getPSPs().length;
-                document.getElementById("st4").textContent = S.batches.length;
-                document.getElementById("st5").textContent = S.dateCol || "—";
-                document.getElementById("st6").textContent =
-                    S.dateCol && S.rows[0]
-                        ? "e.g. " + String(S.rows[0][S.dateCol]).slice(0, 14)
-                        : "";
+                const statsHTML = `
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-label">Total Rows</div>
+                            <div class="stat-value">${S.rows.length.toLocaleString()}</div>
+                        </div>
+                        <div class="stat-icon-wrap">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-label">Filtered Rows</div>
+                            <div class="stat-value">${f.length.toLocaleString()}</div>
+                            <div class="stat-badge success">↑ 100%</div>
+                        </div>
+                        <div class="stat-icon-wrap">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-label">Unique PSPs</div>
+                            <div class="stat-value">${getPSPs().length}</div>
+                        </div>
+                        <div class="stat-icon-wrap">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-info">
+                            <div class="stat-label">Batches Stored</div>
+                            <div class="stat-value">${S.batches.length}</div>
+                        </div>
+                        <div class="stat-icon-wrap">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+                        </div>
+                    </div>
+                `;
+                document.getElementById("stats").innerHTML = statsHTML;
 
                 // Header badges
                 const rb = document.getElementById("rowbadge");
@@ -1239,7 +1251,7 @@
                     tbody.innerHTML = pg
                         .map(
                             (row, i) =>
-                                `<tr style="background:${i % 2 === 0 ? "transparent" : "#091521"}">` +
+                                `<tr>` +
                                 S.cols
                                     .map((c) => {
                                         const cls =
@@ -1268,12 +1280,10 @@
          <span id="pginfo">${Math.min((S.page - 1) * PER_PAGE + 1, f.length)}–${Math.min(S.page * PER_PAGE, f.length)} / ${f.length}</span>`;
                 document.getElementById("pagbar").innerHTML = ph;
             }
-
             function gp(p) {
                 S.page = p;
                 drawDashboard();
             }
-
             // ══════════════════════════════════════════════
             //  UPLOADS TAB
             // ══════════════════════════════════════════════
@@ -1295,21 +1305,25 @@
                     .reverse()
                     .map(
                         (b) => `
-    <div class="upcard">
-      <div style="font-size:26px;flex-shrink:0">📄</div>
-      <div class="upcard-info">
-        <div class="upcard-name">${eh(b.name)}</div>
-        <div class="upcard-meta">
-          <span class="upcard-date">🕐 ${new Date(b.date).toLocaleString()}</span>
-          <span class="tag tag-g">${b.count?.toLocaleString()} rows</span>
-          <span class="tag tag-b">${b.headers?.length || 0} cols</span>
+    <div class="file-card">
+        <div class="file-icon">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M14 2V8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M16 13H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M16 17H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M10 9H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
         </div>
-      </div>
-      <div class="upcard-acts">
-        <button class="btn btn-gray sm" onclick="viewBatch('${b.uid}')">View</button>
-        <button class="btn btn-gray sm" onclick="exportBatch('${b.uid}','${esc(b.name)}')">⬇ Export</button>
-        <button class="btn btn-red sm" onclick="openDelModal('${b.uid}','${esc(b.name)}',${b.count})">🗑</button>
-      </div>
+        <div class="file-info">
+            <div class="file-name">${eh(b.name)}</div>
+            <div class="file-meta">${(b.count * 1.5).toFixed(1)}KB</div>
+        </div>
+        <div class="file-actions">
+            <button class="file-btn view" onclick="viewBatch('${b.uid}')" title="View Data">👁</button>
+            <button class="file-btn dl" onclick="exportBatch('${b.uid}','${esc(b.name)}')" title="Download">⬇</button>
+            <button class="file-close" onclick="openDelModal('${b.uid}','${esc(b.name)}',${b.count})" title="Remove">✕</button>
+        </div>
     </div>`,
                     )
                     .join("");
@@ -1425,8 +1439,7 @@
                 document
                     .getElementById("tab-up")
                     .classList.toggle("active", t === "up");
-                document.getElementById("tab-up").textContent =
-                    `📁 Uploads (${S.batches.length})`;
+                document.getElementById("up-count-badge").textContent = S.batches.length;
                 if (t === "up") drawUploads();
             }
 
@@ -1487,8 +1500,7 @@
 
             function renderAll() {
                 applyFilters();
-                document.getElementById("tab-up").textContent =
-                    `📁 Uploads (${S.batches.length})`;
+                document.getElementById("up-count-badge").textContent = S.batches.length;
                 if (S.tab === "up") drawUploads();
             }
 
@@ -1531,23 +1543,31 @@
                                 });
                                 meta = {
                                     batches: Object.values(bMap),
-                                    cols: [
-                                        ...new Set(
-                                            rows.flatMap((r) =>
-                                                Object.keys(r).filter(
-                                                    (k) => !k.startsWith("_"),
-                                                ),
-                                            ),
-                                        ),
-                                    ],
-                                    dateCol:
-                                        Object.keys(rows[0] || {}).find(
-                                            (k) => !k.startsWith("_"),
-                                        ) || "",
-                                    pspCol:
-                                        Object.keys(rows[0] || {}).find((k) =>
-                                            /psp/i.test(k),
-                                        ) || "",
+                                    cols: (function() {
+                                        const seen = new Set();
+                                        const ordered = [];
+                                        rows.forEach(r => {
+                                            Object.keys(r).forEach(k => {
+                                                if (!k.startsWith("_") && !seen.has(k)) {
+                                                    seen.add(k);
+                                                    ordered.push(k);
+                                                }
+                                            });
+                                        });
+                                        return ordered;
+                                    })(),
+                                    dateCol: (function() {
+                                        const cols = rows[0] ? Object.keys(rows[0]).filter(k => !k.startsWith("_")) : [];
+                                        const dateKeywords = ["date", "time", "created", "timestamp", "period"];
+                                        let found = cols.find(c => dateKeywords.some(k => c.toLowerCase().includes(k)));
+                                        if (!found && rows[0] && cols[0] && normDate(rows[0][cols[0]])) found = cols[0];
+                                        return found || "";
+                                    })(),
+                                    pspCol: (function() {
+                                        const cols = rows[0] ? Object.keys(rows[0]).filter(k => !k.startsWith("_")) : [];
+                                        const pspKeywords = ["psp", "provider", "gateway", "vendor", "method", "processor", "acquirer"];
+                                        return cols.find(c => pspKeywords.some(k => c.toLowerCase().includes(k))) || "";
+                                    })(),
                                 };
                                 // Save locally
                                 S.rows = rows;
@@ -1571,18 +1591,18 @@
                     // Show which storage engine is active
                     const badge = document.getElementById("hdrbadge");
                     if (IDB_OK) {
-                        badge.textContent = "💾 IndexedDB";
+                        // badge.textContent = "💾 IndexedDB";
                         badge.title =
                             "Data saved to IndexedDB (unlimited storage)";
                     } else {
-                        badge.textContent = "💾 localStorage";
+                        badge.textContent = "localStorage";
                         badge.className = "hbadge hb-b";
                         badge.title =
                             "IndexedDB unavailable — using localStorage fallback";
                     }
                     if (S.rows.length)
                         document.getElementById("save-status").textContent =
-                            `💾 ${S.rows.length.toLocaleString()} rows restored`;
+                            `${S.rows.length.toLocaleString()} rows restored`;
                 } catch (e) {
                     console.error("Init error:", e);
                 }

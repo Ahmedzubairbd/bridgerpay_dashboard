@@ -9,7 +9,8 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: "50mb" }));
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 
 // Serve static files (specifically allow only what's needed)
 app.get("/", (req, res) => {
@@ -43,7 +44,7 @@ app.use("/api/auth", auth);
 app.use("/api/user", user);
 app.use("/api/transactions", transaction);
 
-const port = process.env.PORT || 8080;
+const port = process.env.PORT || 3030;
 if (require.main === module) {
   app.listen(port, () => console.log(`Server started on port ${port}`));
 }
